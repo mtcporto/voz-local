@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leitor de Texto - Web Speech API</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            color: #212529;
+            font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            padding-top: 2rem;
+        }
+        .card {
+            border-radius: 16px;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.08);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 20px rgba(0, 0, 0, 0.12);
+        }
+        .card-header {
+            background-color: #6c63ff;
+            color: #fff;
+            font-weight: 500;
+            border-top-left-radius: 16px !important;
+            border-top-right-radius: 16px !important;
+        }
+        .form-select, .form-control {
+            border-radius: 8px;
+        }
+        .btn-primary {
+            background-color: #6c63ff;
+            border-color: #6c63ff;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover, .btn-primary:focus {
+            background-color: #5a52d5;
+            border-color: #5a52d5;
+            transform: translateY(-2px);
+        }
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+        .text-area {
+            border-radius: 8px;
+            min-height: 120px;
+            line-height: 1.6;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+            background-color: #dc3545;
+        }
+        .status-indicator.speaking {
+            background-color: #28a745;
+        }
+        .status-text {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+        .bold-text {
+            font-weight: bold;
+        }
+        .voice-selector-wrapper {
+            margin-bottom: 1rem;
+        }
+        .speak-controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }
+        #statusContainer {
+            margin-top: 1rem;
+        }
+        .attribution {
+            margin-top: 2rem;
+            font-size: 0.8rem;
+            text-align: center;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8 col-md-10">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h3 class="mb-0">Leitor de Texto</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="voice-selector-wrapper">
+                            <label for="voiceSelector" class="form-label">Selecione uma voz em pt-BR:</label>
+                            <select id="voiceSelector" class="form-select"></select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="textToRead" class="form-label">Texto para ser lido:</label>
+                            <textarea id="textToRead" class="form-control text-area">Certa vez, **Albert Einstein** disse: 'A imaginação é mais importante que o conhecimento. Pois o conhecimento é limitado, mas a imaginação é infinita.'</textarea>
+                        </div>
+                        
+                        <div class="speak-controls">
+                            <button id="speakButton" class="btn btn-primary">
+                                <i class="bi bi-volume-up"></i> Ler Texto
+                            </button>
+                            <button id="pauseButton" class="btn btn-outline-secondary" disabled>
+                                <i class="bi bi-pause"></i> Pausar
+                            </button>
+                            <button id="resumeButton" class="btn btn-outline-secondary" disabled>
+                                <i class="bi bi-play"></i> Continuar
+                            </button>
+                            <button id="stopButton" class="btn btn-outline-danger" disabled>
+                                <i class="bi bi-stop"></i> Parar
+                            </button>
+                        </div>
+                        
+                        <div id="statusContainer" class="mt-3">
+                            <div class="d-flex align-items-center">
+                                <span id="statusIndicator" class="status-indicator"></span>
+                                <span id="statusText" class="status-text">Pronto para ler</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="attribution">
+                    <p>Utilizando Web Speech API para leitura de texto com suporte a diferentes vozes pt-BR</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const voiceSelector = document.getElementById('voiceSelector');
+            const textToRead = document.getElementById('textToRead');
+            const speakButton = document.getElementById('speakButton');
+            const pauseButton = document.getElementById('pauseButton');
+            const resumeButton = document.getElementById('resumeButton');
+            const stopButton = document.getElementById('stopButton');
+            const statusIndicator = document.getElementById('statusIndicator');
+            const statusText = document.getElementById('statusText');
+            
+            // Speech synthesis setup
+            const synth = window.speechSynthesis;
+            let voices = [];
+            let currentUtterance = null;
+            
+            // Process text for better speech (treat markdown and special formatting)
+            function processText(text) {
+                // Remove markdown bold indicators
+                text = text.replace(/\*\*(.*?)\*\*/g, '$1');
+                return text;
+            }
+            
+            // Fetch available voices
+            function loadVoices() {
+                voices = synth.getVoices();
+                
+                // Filter Portuguese voices
+                const ptVoices = voices.filter(voice => 
+                    voice.lang.includes('pt') || 
+                    voice.lang.includes('pt-BR') || 
+                    voice.name.includes('Portuguese') || 
+                    voice.name.includes('Brasil')
+                );
+                
+                // Clear voice selector
+                voiceSelector.innerHTML = '';
+                
+                // If no pt voices found, add all voices
+                const voicesToDisplay = ptVoices.length > 0 ? ptVoices : voices;
+                
+                // Add voices to selector
+                voicesToDisplay.forEach(voice => {
+                    const option = document.createElement('option');
+                    option.textContent = `${voice.name} (${voice.lang})`;
+                    option.setAttribute('data-voice-uri', voice.voiceURI);
+                    voiceSelector.appendChild(option);
+                });
+                
+                // If pt voices found, show message
+                if (ptVoices.length === 0) {
+                    statusText.textContent = "Atenção: Não foram encontradas vozes em Português. Mostrando todas as vozes disponíveis.";
+                }
+            }
+            
+            // Initial voice loading (may not work immediately in all browsers)
+            loadVoices();
+            
+            // Chrome and Edge load voices asynchronously, so we need this event
+            if (speechSynthesis.onvoiceschanged !== undefined) {
+                speechSynthesis.onvoiceschanged = loadVoices;
+            }
+            
+            // Fallback for browsers where onvoiceschanged doesn't fire reliably
+            setTimeout(() => {
+                if (voiceSelector.options.length === 0) {
+                    loadVoices();
+                }
+            }, 1000);
+            
+            // Add a notification for better voice availability
+            let browserInfo = '';
+            const userAgent = navigator.userAgent.toLowerCase();
+            
+            if (userAgent.includes('edg')) {
+                browserInfo = 'Você está usando o Edge, que oferece vozes em português de alta qualidade!';
+            } else if (userAgent.includes('chrome')) {
+                browserInfo = 'Para melhores vozes em português, considere usar o Microsoft Edge.';
+            } else if (userAgent.includes('firefox')) {
+                browserInfo = 'Firefox detectado. Para vozes de maior qualidade, considere usar o Microsoft Edge.';
+            }
+            
+            if (browserInfo) {
+                const browserInfoEl = document.createElement('div');
+                browserInfoEl.className = 'browser-info alert alert-info mt-3';
+                browserInfoEl.textContent = browserInfo;
+                document.querySelector('.voice-selector-wrapper').appendChild(browserInfoEl);
+            }
+            
+            // Speak function
+            function speak() {
+                // Stop any ongoing speech
+                if (synth.speaking) {
+                    synth.cancel();
+                }
+                
+                const processedText = processText(textToRead.value);
+                
+                if (processedText !== '') {
+                    // Create utterance
+                    currentUtterance = new SpeechSynthesisUtterance(processedText);
+                    
+                    // Set selected voice
+                    if (voiceSelector.selectedOptions.length > 0) {
+                        const selectedVoiceURI = voiceSelector.selectedOptions[0].getAttribute('data-voice-uri');
+                        const selectedVoice = voices.find(voice => voice.voiceURI === selectedVoiceURI);
+                        if (selectedVoice) {
+                            currentUtterance.voice = selectedVoice;
+                        }
+                    } else {
+                        // Try to find a Microsoft pt-BR voice if no selection
+                        const msVoice = voices.find(voice => 
+                            voice.lang === 'pt-BR' && 
+                            (voice.name.includes('Microsoft') || voice.voiceURI.includes('Microsoft'))
+                        );
+                        
+                        if (msVoice) {
+                            currentUtterance.voice = msVoice;
+                            statusText.textContent = "Usando voz Microsoft automaticamente";
+                        } else {
+                            // Try any pt-BR voice
+                            const ptBRVoice = voices.find(voice => voice.lang === 'pt-BR');
+                            if (ptBRVoice) {
+                                currentUtterance.voice = ptBRVoice;
+                                statusText.textContent = "Usando voz pt-BR automaticamente";
+                            }
+                        }
+                    }
+                    
+                    // Set rate and pitch
+                    currentUtterance.rate = 1.0;
+                    currentUtterance.pitch = 1.0;
+                    
+                    // Events
+                    currentUtterance.onstart = () => {
+                        statusIndicator.classList.add('speaking');
+                        statusText.textContent = 'Lendo...';
+                        
+                        speakButton.disabled = true;
+                        pauseButton.disabled = false;
+                        stopButton.disabled = false;
+                        resumeButton.disabled = true;
+                    };
+                    
+                    currentUtterance.onend = () => {
+                        statusIndicator.classList.remove('speaking');
+                        statusText.textContent = 'Leitura concluída';
+                        
+                        speakButton.disabled = false;
+                        pauseButton.disabled = true;
+                        resumeButton.disabled = true;
+                        stopButton.disabled = true;
+                    };
+                    
+                    currentUtterance.onerror = (event) => {
+                        statusIndicator.classList.remove('speaking');
+                        statusText.textContent = `Erro: ${event.error}`;
+                        
+                        speakButton.disabled = false;
+                        pauseButton.disabled = true;
+                        resumeButton.disabled = true;
+                        stopButton.disabled = true;
+                    };
+                    
+                    // Start speaking
+                    synth.speak(currentUtterance);
+                }
+            }
+            
+            // Button event listeners
+            speakButton.addEventListener('click', speak);
+            
+            pauseButton.addEventListener('click', () => {
+                if (synth.speaking) {
+                    synth.pause();
+                    statusIndicator.classList.remove('speaking');
+                    statusText.textContent = 'Pausado';
+                    
+                    pauseButton.disabled = true;
+                    resumeButton.disabled = false;
+                }
+            });
+            
+            resumeButton.addEventListener('click', () => {
+                if (synth.paused) {
+                    synth.resume();
+                    statusIndicator.classList.add('speaking');
+                    statusText.textContent = 'Lendo...';
+                    
+                    pauseButton.disabled = false;
+                    resumeButton.disabled = true;
+                }
+            });
+            
+            stopButton.addEventListener('click', () => {
+                if (synth.speaking) {
+                    synth.cancel();
+                    statusIndicator.classList.remove('speaking');
+                    statusText.textContent = 'Leitura interrompida';
+                    
+                    speakButton.disabled = false;
+                    pauseButton.disabled = true;
+                    resumeButton.disabled = true;
+                    stopButton.disabled = true;
+                }
+            });
+            
+            // Format text function to render markdown in the textarea
+            function formatTextDisplay() {
+                const text = textToRead.value;
+                // Process it for markdown if needed in future
+            }
+            
+            // Initial formatting
+            formatTextDisplay();
+            
+            // Update formatting when text changes
+            textToRead.addEventListener('input', formatTextDisplay);
+        });
+    </script>
+</body>
+</html>
