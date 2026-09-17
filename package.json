@@ -1,0 +1,9 @@
+{
+  "name": "voz-local",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": { "dev": "vite", "build": "vite build", "preview": "vite preview", "test": "node --test" },
+  "dependencies": { "onnxruntime-web": "1.30.0" },
+  "devDependencies": { "vite": "^7.1.0" }
+}
