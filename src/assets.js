@@ -20,7 +20,11 @@ export async function cachedFetch(url, report, label) {
     if (hit) { report({ type: 'asset', source: 'cache', label }); return hit; }
   } catch { /* Downloads still work when storage is unavailable. */ }
   report({ type: 'status', message: `Baixando ${label}…` });
-  const response = await fetch(url);
+  let response;
+  try { response = await fetch(url); }
+  catch (cause) {
+    throw new Error(`Não foi possível baixar ${label}. Verifique a conexão e se o CORS do bucket permite o endereço deste site.`, { cause });
+  }
   if (!response.ok) throw new Error(`Falha ao baixar ${label} (${response.status}).`);
   if (cache) {
     try { await cache.put(url, response.clone()); }

@@ -195,6 +195,16 @@ test('cache quota error does not download twice; partial model cache is not comp
   } finally { if (original === undefined) delete globalThis.caches; else globalThis.caches = original; }
 });
 
+test('network failure identifies the asset and suggests checking connectivity and CORS', async t => {
+  t.mock.method(globalThis, 'fetch', async () => { throw new TypeError('Failed to fetch'); });
+  await assert.rejects(cachedFetch('https://example.com/missing.onnx', () => {}, 'modelo de voz'), error => {
+    assert.match(error.message, /modelo de voz/);
+    assert.match(error.message, /conexão.*CORS/);
+    assert.equal(error.cause.message, 'Failed to fetch');
+    return true;
+  });
+});
+
 test('comparison generates a valid WAV without starting playback', async () => {
   const h = harness();
   const rendered = h.engine.renderSample('Bom dia!', { language: 'na', qualitySteps: 10, seed: 20260917 });

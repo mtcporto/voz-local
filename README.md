@@ -78,7 +78,16 @@ Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Embedder-Policy: require-corp
 ```
 
-O CORS do bucket precisa permitir a origem do site. Para produção, incluir o domínio real nas regras do R2; o arquivo `r2-cors.json` contém as origens locais. Não modificar os arquivos do modelo na mesma URL sem versionar os caminhos/cache.
+O CORS do bucket precisa permitir a origem do site. O arquivo `r2-cors.json` contém as origens locais e os três aliases estáveis do projeto na Vercel, incluindo [o site publicado](https://tts-wsapi.vercel.app). O endereço da hospedagem ainda usa o nome antigo; o repositório e a aplicação se chamam Voz Local.
+
+Após adicionar um domínio ou mudar o endereço do projeto, atualize as origens exatas no arquivo e aplique a configuração ao bucket (commitar o JSON ou fazer deploy na Vercel não altera o R2):
+
+```bash
+npx wrangler r2 bucket cors set tts-wsapi-models --file r2-cors.json
+npx wrangler r2 bucket cors list tts-wsapi-models
+```
+
+URLs temporárias de preview não são liberadas automaticamente. Um `Failed to fetch` que só acontece na hospedagem pode ser bloqueio de CORS: confira a requisição no navegador e o cabeçalho `Access-Control-Allow-Origin` do bucket. Veja a [documentação de CORS do R2](https://developers.cloudflare.com/r2/buckets/cors/). O cache do localhost é separado do cache do domínio publicado; a primeira leitura em cada origem precisa baixar seus modelos. Não modificar os arquivos do modelo na mesma URL sem versionar os caminhos/cache.
 
 ## Verificação
 
