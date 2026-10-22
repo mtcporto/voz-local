@@ -114,3 +114,8 @@ Há também regressão específica para a citação curta de Einstein: o texto c
 Os pesos e estilos de voz seguem a licença do [Supertonic 3](https://huggingface.co/Supertone/supertonic-3). Hospedar uma cópia no R2 não altera esses termos; consulte a licença upstream antes de redistribuir ou usar os modelos em outro produto.
 
 Referências: [PocketPal AI](https://github.com/a-ghorbani/pocketpal-ai), [motor usado pelo PocketPal](https://github.com/a-ghorbani/react-native-speech/tree/v2.5.0/src/engines/supertonic) e [Supertonic](https://github.com/supertone-oss-archive/supertonic). A arquitetura de aplicação, bucket e cache foi mantida.
+
+
+## Desenvolvimento
+
+Baseline: Node.js 24.x. Consulte o `package.json` para instalação, validação e build.
